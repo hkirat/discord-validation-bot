@@ -1,0 +1,23 @@
+* {
+  font-family: monospace;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
+} 
+
+.form input {
+  margin-bottom: 10px;
+  padding: 3px;
+}
+
+.form button {
+  max-width: 50%;
+  margin-bottom: 10px;
+  border: 2px solid black;
+  border-radius: 5px;
+}
