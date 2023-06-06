@@ -21,3 +21,12 @@
   border: 2px solid black;
   border-radius: 5px;
 }
+
+.message {
+  display: flex;
+}
+
+.message p {
+  margin-right: 10px;
+}
+
