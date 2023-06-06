@@ -1,7 +1,7 @@
 ## Discord validation bot
 
 ### The problem
-Discord was joined by folks who hadn't bought my course by sharnig liks amongst themselves
+Discord was joined by folks who hadn't bought my course by sharnig links amongst themselves
 
 ### Constraints
 A way to verify email inside discord with the following constraints - 
