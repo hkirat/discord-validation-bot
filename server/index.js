@@ -1,53 +1,102 @@
-const express = require('express')
-const app = express()
-const port = 3000
-const algorithm = 'aes-256-cbc';
-const crypto = require("crypto")
-const ADMIN_SECRET = "H@rkirat";
-const cors = require("cors");
-app.use(cors())
-const  secret = Buffer.from("SECRET");
-let key = crypto.createHash('sha256').update(String(secret)).digest('base64').substr(0, 32);
+require("dotenv").config();
 
-function encrypt(text) {
-  const iv = crypto.randomBytes(16); // Generate a random initialization vector
-  const cipher = crypto.createCipheriv(algorithm, key, iv);
+const express = require("express");
+const axios = require("axios");
 
-  let encrypted = cipher.update(text);
-  encrypted = Buffer.concat([encrypted, cipher.final()]);
+const app = express();
+const port = 3000;
 
-  // Output iv and encrypted data, both in hex
-  return `${iv.toString('hex')}:${encrypted.toString('hex')}`;
-}
+const DISCORD_CLEINT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
+const DISCORD_OPEN_SOURCE__ROLE_ID = process.env.DISCORD_OPEN_SOURCE__ROLE_ID;
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
 
-function decrypt(text) {
-  const [iv, encryptedText] = text.split(':');
+const discordApiInstace = axios.create({
+  baseURL: "https://discord.com/api",
 
-  const decipher = crypto.createDecipheriv(algorithm, key, Buffer.from(iv, 'hex'));
-  
-  let decrypted = decipher.update(Buffer.from(encryptedText, 'hex'));
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  headers: {
+    "Accept-Encoding": "*",
+  },
+});
 
-  return decrypted.toString();
-}
+app.get("/discord/verify/:code", async (req, res) => {
+  try {
+    const code = req.params.code;
+    console.log("Getting Access Token");
+    console.log({
+      client_id: DISCORD_CLIENT_ID,
+      client_secret: DISCORD_CLEINT_SECRET,
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: DISCORD_REDIRECT_URI,
+    });
+    const { data: tokenInfo } = await discordApiInstace.post(
+      `/oauth2/token`,
+      {
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLEINT_SECRET,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: DISCORD_REDIRECT_URI,
+      },
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Accept-Encoding": "*",
+        },
+      }
+    );
 
-app.get('/secret', (req, res) => {
-	const email = req.query.email;
-	const encryptedEmail = encrypt(email);
-	res.json({message: "@check " + encryptedEmail});
-})
+    if (!tokenInfo || !tokenInfo.access_token)
+      return res.status(404).json({ error: "access_token not found" });
 
-app.get("/decode", (req, res) => {
-	if (ADMIN_SECRET !== req.query.secret) {
-            return res.status(403).json({});
-	}
-	const encryptedEmail = req.query.email;
-	const decryptedEmail = decrypt(encryptedEmail);
-	res.json({email: decryptedEmail});
+    const accessToken = tokenInfo.access_token;
+
+    console.log("Getting User Public Info");
+    const { data: userInfo } = await discordApiInstace.get("/users/@me", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!userInfo) return res.status(404).json({ error: "userInfo not found" });
+
+    // TODO: Verify if the user has purchased the course because you have the email id of user
+    const { email, id } = userInfo;
+    console.log(`User Email`, email);
+
+    // Add the user to the discord group
+    await discordApiInstace.put(
+      `/guilds/${DISCORD_GUILD_ID}/members/${userInfo.id}`,
+      {
+        access_token: accessToken,
+      },
+      {
+        headers: {
+          Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+        },
+        responseType: "json",
+      }
+    );
+
+    console.log("Assigning role to user");
+    await discordApiInstace.put(
+      `/guilds/${DISCORD_GUILD_ID}/members/${userInfo.id}/roles/${DISCORD_OPEN_SOURCE__ROLE_ID}`,
+      {},
+      {
+        headers: {
+          Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+        },
+      }
+    );
+    return res.status(200).json({ message: "Success" });
+  } catch (error) {
+    return res.status(500).json({ message: "error" });
+  }
 });
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
-
-
+  console.log(`Example app listening on port ${port}`);
+});
